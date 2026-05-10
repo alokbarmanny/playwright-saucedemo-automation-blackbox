@@ -15,6 +15,10 @@ import java.nio.file.Path;
 public class JsonArrayOrObjectReader {
 
     public JSONObject readFirstObject(String filePath) {
+        return readIndexedObject(filePath, 0);
+    }
+
+    public JSONObject readIndexedObject(String filePath, int index) {
         String content = readContent(filePath).trim();
 
         if (content.startsWith("[")) {
@@ -22,7 +26,8 @@ public class JsonArrayOrObjectReader {
             if (arr.length() == 0) {
                 throw new RuntimeException("No user objects found in JSON array: " + filePath);
             }
-            return arr.getJSONObject(0);
+            return arr.getJSONObject(Math.min(index, arr.length() - 1));
+
         }
 
         JSONObject obj = new JSONObject(content);
@@ -43,11 +48,37 @@ public class JsonArrayOrObjectReader {
     }
 
     private String readContent(String filePath) {
+        // 1) Try filesystem path (works when running from project root).
         try {
             return Files.readString(Path.of(filePath), StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            throw new RuntimeException("Unable to read JSON file: " + filePath, e);
+        } catch (Exception filesystemFailure) {
+            // 2) Fallback: try classpath resource.
+            String classpathLocation = normalizeToClasspathLocation(filePath);
+            try (var is = getClass().getClassLoader().getResourceAsStream(classpathLocation)) {
+                if (is == null) {
+                    throw new RuntimeException("Unable to read JSON file: " + filePath, filesystemFailure);
+                }
+                byte[] bytes = is.readAllBytes();
+                return new String(bytes, StandardCharsets.UTF_8);
+            } catch (Exception classpathFailure) {
+                throw new RuntimeException("Unable to read JSON file: " + filePath, classpathFailure);
+            }
         }
     }
-}
 
+    private String normalizeToClasspathLocation(String filePath) {
+        String fp = filePath.replace("\\", "/");
+        int idx = fp.indexOf("src/test/resources/");
+        if (idx >= 0) {
+            fp = fp.substring(idx + "src/test/resources/".length());
+        }
+        if (fp.startsWith("resources/")) {
+            fp = fp.substring("resources/".length());
+        }
+        while (fp.startsWith("/")) {
+            fp = fp.substring(1);
+        }
+        return fp;
+    }
+
+}
