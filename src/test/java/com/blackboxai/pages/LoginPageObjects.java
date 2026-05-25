@@ -35,9 +35,9 @@ public class LoginPageObjects extends BasePage {
     }
 
     public boolean isLoggedInSuccessfully() {
-        // After successful login, sauce demo shows "Products" header.
+        // After successful login, saucedemo shows the page header "Products" inside
+        // span.title.
         return page.locator("span.title").first().isVisible();
     }
+
 }
-
-
